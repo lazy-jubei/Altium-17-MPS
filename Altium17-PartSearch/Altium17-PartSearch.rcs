@@ -1,0 +1,34 @@
+PL
+    Altium17-PartSearch:Search
+    Command='Altium17-PartSearch:Search'
+    Caption='Manufacturer Part Search (AD17)'
+    Image=''
+    Shortcut1=''
+    Shortcut2=''
+    Params=''
+    Description='Search Altium suppliers and import library components with supplier parameters'
+End
+
+Insertion _Mps1 TargetID='MNNoDocument_File' RefID0='NoDoc'
+    Link _Mps2 PLID='Altium17-PartSearch:Search' End
+End
+
+Insertion _Mps3 TargetID='MNSchematic_File' RefID0='SchDoc_File'
+    Link _Mps4 PLID='Altium17-PartSearch:Search' End
+End
+
+Insertion _Mps5 TargetID='MNSchematic_Tools10' RefID0='SchDoc_Tools'
+    Link _Mps6 PLID='Altium17-PartSearch:Search' End
+End
+
+Insertion _Mps7 TargetID='MNSchematic_SchLibMenuTools10' RefID0='SchLib_Tools'
+    Link _Mps8 PLID='Altium17-PartSearch:Search' End
+End
+
+Insertion _Mps9 TargetID='MNPCB_Tools10' RefID0='PcbDoc_Tools'
+    Link _Mps10 PLID='Altium17-PartSearch:Search' End
+End
+
+Insertion _Mps11 TargetID='MNPCBLib_Tools10' RefID0='PcbLib_Tools'
+    Link _Mps12 PLID='Altium17-PartSearch:Search' End
+End
