@@ -15,7 +15,11 @@ foreach ($name in $files) { Copy-Item (Join-Path $bin $name) $dist }
 $release = Join-Path $PSScriptRoot 'release'
 New-Item -ItemType Directory -Path $release -Force | Out-Null
 $archive = Join-Path $release 'Altium-17-MPS.zip'
-$archiveFiles = @($dist, (Join-Path $PSScriptRoot 'Deploy.ps1'), (Join-Path $PSScriptRoot '_Shared.ps1'), (Join-Path $PSScriptRoot 'LICENSE'), (Join-Path $PSScriptRoot 'README.md'))
+$setup = Join-Path $PSScriptRoot "Installer/bin/$Configuration/Altium-17-MPS-Setup.exe"
+if (-not (Test-Path $setup -PathType Leaf)) { throw 'Build the graphical installer first.' }
+$releaseSetup = Join-Path $release 'Altium-17-MPS-Setup.exe'
+Copy-Item $setup $releaseSetup -Force
+$archiveFiles = @($dist, $releaseSetup, (Join-Path $PSScriptRoot 'Deploy.ps1'), (Join-Path $PSScriptRoot '_Shared.ps1'), (Join-Path $PSScriptRoot 'LICENSE'), (Join-Path $PSScriptRoot 'README.md'))
 $toolsParent = Join-Path ([System.IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString('N'))
 $toolsStage = Join-Path $toolsParent 'tools'
 try {

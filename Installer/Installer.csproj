@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>Altium-17-MPS-Setup</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>x86</PlatformTarget>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <LangVersion>12.0</LangVersion>
+    <Version>0.2.2</Version>
+    <DebugType>embedded</DebugType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" PrivateAssets="all" />
+    <EmbeddedResource Include="../Altium17-PartSearch/bin/$(Configuration)/Altium17-PartSearch.dll;../Altium17-PartSearch/bin/$(Configuration)/Altium17-PartSearch.Ins;../Altium17-PartSearch/bin/$(Configuration)/Altium17-PartSearch.rcs;../Altium17-PartSearch/bin/$(Configuration)/Altium17-PartSearch.target.json">
+      <LogicalName>Payload.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+</Project>
