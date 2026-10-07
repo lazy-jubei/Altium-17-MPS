@@ -2,22 +2,23 @@
 
 An Altium plugin that backports Manufacturer Part Search to Altium Designer 17.
 
-- Searches Altium's configured suppliers by MPN or description.
-- Shows technical parameters, supplier stock, prices and datasheet links.
-- Downloads matching symbols, footprints and available 3D models from connected Altium Vaults.
-- Fixes footprint links in local copies so AD17 can resolve their 3D bodies.
-- Copies a matching library component with supplier metadata; placement supports undo/redo.
-- Fixes Ciiva's broken MPN lookup and supplier links, and keeps dialogs visible under Wine.
+- Dockable panel in AD17's bottom-right **System** menu.
+- Category browsing, sortable results, parameter filters, stock, prices and datasheets.
+- Schematic symbol and footprint previews, including multipart symbols.
+- **Place part** downloads matching CAD from Altium Vaults and attaches the symbol to your schematic cursor. Undo/redo works normally.
+- Fixes Ciiva lookup, supplier links and local footprint/3D model links.
 
 Tested in **Altium Designer 17.1 under Wine**. Uses Altium's existing login; CAD models must be available in a connected Vault.
+
+<img src="docs/part-search-panel.png" alt="Manufacturer Part Search with symbol and footprint previews" width="420">
 
 ## Install
 
 Download **Altium-17-MPS-Setup.exe** from the [release](https://github.com/lazy-jubei/Altium-17-MPS/releases/latest). Close AD17, run the installer in Windows or your AD17 Wine prefix, and click **Install**. No PowerShell is needed.
 
-The ZIP also includes the PowerShell and Python installers for manual deployment.
+Restart Altium, then choose **System → Manufacturer Part Search (AD17)** at the bottom right. File and Tools shortcuts are also available. Drag the panel to dock it beside your schematic.
 
-Restart Altium, then open **Manufacturer Part Search (AD17)** from File or Tools. It runs inside Altium; no script is needed to use it. Search, select a part and choose **Download CAD models**. If several revisions match, select one in Models. Reimport parts downloaded with v0.2.0 to refresh their footprint links. **Import library component...** remains available for installed libraries.
+Search or choose a category, select a part, preview its CAD and click **Place part**. If several revisions match, choose one in **Models**. **Choose local model** supports installed libraries. The ZIP includes manual installers.
 
 Output is `Documents/AltiumParts/ManufacturerParts.schlib`; `ALTIUM_PART_SEARCH_LIBRARY_DIR` overrides it. Keep the source libraries or Altium's Vault cache for linked models.
 

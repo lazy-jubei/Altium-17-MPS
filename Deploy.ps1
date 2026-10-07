@@ -30,7 +30,7 @@ function Update-ExtensionsRegistry([string]$RegistryPath, [string]$DeployDir) {
     if (@($existing).Count -gt 1) { throw 'Duplicate part search entries in the extension registry.' }
     if ($existing) {
         $existing.Path = $DeployDir
-        foreach ($field in @{ Version = '0.2.2.0'; VersionGuid = $PluginVerGuid }.GetEnumerator()) {
+        foreach ($field in @{ Version = '0.3.0.0'; VersionGuid = $PluginVerGuid }.GetEnumerator()) {
             $el = $existing.SelectSingleNode($field.Key)
             if (-not $el) { $el = $xml.CreateElement($field.Key); $existing.AppendChild($el) | Out-Null }
             $el.InnerText = $field.Value
@@ -57,7 +57,7 @@ function Update-ExtensionsRegistry([string]$RegistryPath, [string]$DeployDir) {
             LongDescription  = 'Search native Altium suppliers'
             SmallImage       = ''
             LargeImage       = ''
-            Version          = '0.2.2.0'
+            Version          = '0.3.0.0'
             VersionGuid      = $PluginVerGuid
             ReleasedDate     = $oleDate
             ReleaseNotes     = ''

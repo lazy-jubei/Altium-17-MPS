@@ -32,6 +32,8 @@ namespace Altium17PartSearch.PartSearch
         public string Mpn { get; set; }
         public string Description { get; set; }
         public string Category { get; set; }
+        public string CategoryDisplay => PartCategory.Display(Category, Description, Parameters.Keys);
+        public int? AvailableStock => Offers.Where(o => o.Stock.HasValue).Select(o => o.Stock).DefaultIfEmpty(null).Max();
         public string Provider { get; set; }
         public string PartId { get; set; }
         public string Datasheet { get; set; }

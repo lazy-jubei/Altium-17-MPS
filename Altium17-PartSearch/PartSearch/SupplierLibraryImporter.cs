@@ -12,6 +12,7 @@ namespace Altium17PartSearch.PartSearch
         internal string Reference { get; set; }
         internal string LibraryPath { get; set; }
         internal int PartId { get; set; }
+        internal string FootprintName { get; set; }
         internal string VaultName { get; set; }
         internal string VaultGuid { get; set; }
         internal string RevisionGuid { get; set; }
@@ -20,9 +21,11 @@ namespace Altium17PartSearch.PartSearch
         internal Dictionary<string, string> CachedModels { get; set; }
 
         private ISch_Component _component;
-        internal ISch_Component Load() => _component ??= string.IsNullOrWhiteSpace(VaultName)
+        private ISch_Component LoadCopy() => string.IsNullOrWhiteSpace(VaultName)
             ? AltiumApi.GlobalVars.SCHServer.LoadComponentFromLibrary(Reference, LibraryPath)
             : AltiumApi.GlobalVars.SCHServer.LoadComponent(EDP.TLibIdentifierKind.eLibIdentifierKind_VaultName, VaultName, Reference);
+        internal ISch_Component Load() => _component ??= LoadCopy();
+        internal ISch_Component LoadForImport() => LoadCopy();
 
         internal static LibraryModelChoice Browse(string suggestedMpn)
         {
@@ -50,7 +53,7 @@ namespace Altium17PartSearch.PartSearch
         {
             // Clone a component through Altium's own library loader. Its symbol,
             // footprint/model links and multipart definition stay together.
-            var component = choice.Load()
+            var component = choice.LoadForImport()
                 ?? throw new InvalidOperationException("Altium could not load the chosen library component.");
             var parameters = GetParameters(component);
             bool cloudMatch = !string.IsNullOrWhiteSpace(choice.VaultName) &&
@@ -143,6 +146,8 @@ namespace Altium17PartSearch.PartSearch
                 for (var item = iterator.FirstSchObject(); item != null; item = iterator.NextSchObject())
                 {
                     var model = (ISch_Implementation)item;
+                    if (!string.IsNullOrEmpty(choice.FootprintName) && string.Equals(model.GetState_ModelType(), "PCBLIB", StringComparison.OrdinalIgnoreCase))
+                        model.SetState_IsCurrent(string.Equals(model.GetState_ModelName(), choice.FootprintName, StringComparison.OrdinalIgnoreCase));
                     if (!string.IsNullOrWhiteSpace(model.GetState_ModelVaultGUID()))
                     {
                         if (choice.CachedModels == null) continue;

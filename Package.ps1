@@ -20,6 +20,7 @@ if (-not (Test-Path $setup -PathType Leaf)) { throw 'Build the graphical install
 $releaseSetup = Join-Path $release 'Altium-17-MPS-Setup.exe'
 Copy-Item $setup $releaseSetup -Force
 $archiveFiles = @($dist, $releaseSetup, (Join-Path $PSScriptRoot 'Deploy.ps1'), (Join-Path $PSScriptRoot '_Shared.ps1'), (Join-Path $PSScriptRoot 'LICENSE'), (Join-Path $PSScriptRoot 'README.md'))
+if (Test-Path (Join-Path $PSScriptRoot 'docs')) { $archiveFiles += Join-Path $PSScriptRoot 'docs' }
 $toolsParent = Join-Path ([System.IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString('N'))
 $toolsStage = Join-Path $toolsParent 'tools'
 try {

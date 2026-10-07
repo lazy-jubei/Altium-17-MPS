@@ -109,7 +109,7 @@ namespace Altium17MpsSetup
                     }
                 }
                 InstallerCore.Install(selected.Root, payload, assembly.GetName().Version.ToString());
-                status.Text = "Installed. Restart Altium, then choose Manufacturer Part Search (AD17)\nfrom the File or Tools menu.";
+                status.Text = "Installed. Restart Altium, then choose Manufacturer Part Search (AD17)\nfrom the bottom-right System menu.";
                 install.Enabled = false;
             }
             catch (Exception error)
