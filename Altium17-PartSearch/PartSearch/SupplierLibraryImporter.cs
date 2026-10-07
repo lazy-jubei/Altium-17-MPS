@@ -124,7 +124,10 @@ namespace Altium17PartSearch.PartSearch
                     library.GraphicallyInvalidate();
                 }
                 finally { process.PostProcess(libraryDocument, ""); }
-                libraryDocument.DoFileSave("SchLib");
+                libraryDocument.SetModified(true);
+                // DoFileSave takes the editor's save-filter name, not its file extension.
+                if (!libraryDocument.DoFileSave("Advanced Schematic binary library"))
+                    throw new InvalidOperationException("Could not save the manufacturer parts library.");
                 return new ImportedComponent { LibraryPath = path, Reference = reference, PartId = choice.PartId };
             }
             finally
