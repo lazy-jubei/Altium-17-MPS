@@ -26,12 +26,12 @@ namespace Altium17PartSearch.PartSearch
         private SupplierLibraryImporter.ImportedComponent _imported;
         private LibraryModelChoice _importedModel;
         private SupplierOffer _importedOffer;
-        private int _offset;
+        private int _offset, _quantity = 1;
         private string _query;
         private bool _mpnOnly, _inStock;
         private AltiumSupplierSearch.Provider _provider;
         internal SupplierPart SelectedPart => resultsGrid.SelectedItem as SupplierPart;
-        internal SupplierOffer SelectedOffer => offerGrid.SelectedItem as SupplierOffer;
+        internal SupplierOffer SelectedOffer => (offerGrid.SelectedItem as SupplierOfferRow)?.Offer;
         internal LibraryModelChoice SelectedModel { get; private set; }
         private PartCategory Category => categoryCombo.SelectedItem as PartCategory ?? PartCategory.All[0];
 
@@ -154,8 +154,7 @@ namespace Altium17PartSearch.PartSearch
             partTitle.Text = part == null ? "" : $"{part.Manufacturer} {part.Mpn}";
             descriptionText.Text = part?.Description ?? "";
             parameterGrid.ItemsSource = part?.GetImportParameters(null).OrderBy(p => p.Key).ToList();
-            offerGrid.ItemsSource = part?.Offers.OrderByDescending(o => o.Stock.GetValueOrDefault() > 0).ToList();
-            if (part?.Offers.Count > 0) offerGrid.SelectedIndex = 0;
+            ShowOffers();
             SelectedModel = null; _imported = null; _importedModel = null; _importedOffer = null;
             modelGrid.ItemsSource = null;
             _preview = null; symbolImage.Source = footprintImage.Source = null;
@@ -172,9 +171,65 @@ namespace Altium17PartSearch.PartSearch
         {
             if (!_ready) return;
             var offer = SelectedOffer;
-            priceText.Text = offer == null ? "" : (offer.Prices.Count == 0 ? "No price data supplied." : offer.PriceSummary) +
-                (string.IsNullOrWhiteSpace(offer.Updated) ? "" : "\nSupplier updated: " + offer.Updated);
+            priceText.Text = offer == null ? "" : $"{offer.Supplier} · {offer.Sku}\n" +
+                (offer.Prices.Count == 0 ? "No price data supplied." : offer.PriceSummary) +
+                (string.IsNullOrWhiteSpace(offer.Updated) ? "" : "\n" + offer.Updated);
             UpdateControls();
+        }
+
+        private void ShowOffers()
+        {
+            var preferred = SelectedOffer;
+            var rows = SelectedPart?.Offers.Select(o => new SupplierOfferRow(o, _quantity))
+                .OrderByDescending(o => o.CanSupply).ThenByDescending(o => o.Stock)
+                .ThenBy(o => o.Supplier, StringComparer.OrdinalIgnoreCase).ToList();
+            offerGrid.ItemsSource = rows;
+            offerGrid.SelectedItem = rows?.FirstOrDefault(r => r.Offer == preferred || preferred != null && SupplierAvailability.SameListing(r.Offer, preferred))
+                ?? rows?.FirstOrDefault();
+            stockSummary.Text = SelectedPart == null ? "" : SupplierAvailability.Summary(SelectedPart.Offers, _quantity);
+        }
+
+        private void Quantity_Changed(object sender, TextChangedEventArgs e)
+        {
+            if (!_ready) return;
+            bool valid = int.TryParse(quantityBox.Text, out int quantity) && quantity > 0;
+            quantityError.Text = valid ? "" : $"Enter a whole quantity of 1 or more. Showing quantity {_quantity:N0}.";
+            if (!valid) return;
+            _quantity = quantity;
+            ShowOffers();
+        }
+
+        private async void RefreshStock_Click(object sender, RoutedEventArgs e)
+        {
+            if (_closed || _busy || SelectedPart == null || _provider == null) return;
+            var part = SelectedPart;
+            _previewDelay?.Cancel();
+            _request?.Dispose(); _request = new CancellationTokenSource();
+            var token = _request.Token;
+            _busy = true; UpdateControls();
+            try
+            {
+                var result = await _search.RefreshOffersAsync(_provider, part, token, message => { if (!_closed) statusText.Text = message; });
+                if (_closed || token.IsCancellationRequested || SelectedPart != part) return;
+                if (result.Offers.Count == 0)
+                {
+                    statusText.Text = "No matching distributor listings returned. Previous stock retained.";
+                    return;
+                }
+                if (!result.Limited) part.Offers.Clear();
+                SupplierAvailability.Merge(part.Offers, result.Offers);
+                _imported = null; _importedOffer = null;
+                part.StockChanged(); ShowOffers();
+                statusText.Text = $"{result.Offers.Count} distributor listings refreshed at {DateTime.Now:t}. " +
+                    (result.Limited ? "First 500 search results checked; other previous listings retained." : "Stock and prices are supplier snapshots.");
+            }
+            catch (OperationCanceledException) { if (!_closed) statusText.Text = "Stock refresh canceled. Previous stock retained."; }
+            catch (Exception error)
+            {
+                RuntimeDiagnostics.Error("Stock refresh", error);
+                if (!_closed) statusText.Text = "Stock refresh failed: " + error.GetBaseException().Message;
+            }
+            finally { _busy = false; if (!_closed) UpdateControls(); }
         }
 
         private void Model_Changed(object sender, SelectionChangedEventArgs e)
@@ -207,6 +262,8 @@ namespace Altium17PartSearch.PartSearch
             copyButton.IsEnabled = !_busy && SelectedPart != null;
             datasheetButton.IsEnabled = !_busy && WebLinks.IsHttp(SelectedPart?.Datasheet);
             supplierButton.IsEnabled = !_busy && WebLinks.IsHttp(SelectedOffer?.Url);
+            refreshStockButton.IsEnabled = !_busy && _provider != null && !string.IsNullOrWhiteSpace(SelectedPart?.Mpn);
+            quantityBox.IsEnabled = !_busy;
         }
 
         private void OpenLink(string url)
@@ -216,7 +273,11 @@ namespace Altium17PartSearch.PartSearch
             catch (Exception error) { statusText.Text = "Could not open the link: " + error.Message; }
         }
         private void Datasheet_Click(object sender, RoutedEventArgs e) => OpenLink(SelectedPart?.Datasheet);
-        private void Supplier_Click(object sender, RoutedEventArgs e) => OpenLink(SelectedOffer?.Url);
+        private void Supplier_Click(object sender, RoutedEventArgs e)
+        {
+            if (e is MouseButtonEventArgs mouse && ItemsControl.ContainerFromElement(offerGrid, mouse.OriginalSource as DependencyObject) is not DataGridRow) return;
+            OpenLink(SelectedOffer?.Url);
+        }
         private void Copy_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedPart == null) return;
@@ -230,7 +291,11 @@ namespace Altium17PartSearch.PartSearch
             catch (Exception error) { statusText.Text = "Could not copy parameters: " + error.Message; }
         }
 
-        private async void Preview_Click(object sender, RoutedEventArgs e) => await PreparePartAsync(false, true);
+        private async void Preview_Click(object sender, RoutedEventArgs e)
+        {
+            detailsTabs.SelectedItem = previewTab;
+            await PreparePartAsync(false, true);
+        }
         private async void QueuePreview(SupplierPart part, CancellationToken token)
         {
             try
@@ -330,7 +395,6 @@ namespace Altium17PartSearch.PartSearch
                 }
                 if (preview)
                 {
-                    if (_preview != null) detailsTabs.SelectedItem = previewTab;
                     Progress(string.IsNullOrEmpty(previewText.Text) ? "CAD preview ready." : previewText.Text);
                     return;
                 }

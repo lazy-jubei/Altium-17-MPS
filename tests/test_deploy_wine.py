@@ -30,7 +30,7 @@ class DeploymentTests(unittest.TestCase):
         _, second_backup = module.deploy(self.dist,self.prefix)
         items=ET.parse(self.registry).getroot().findall("Item[@HRID='Altium17-PartSearch']")
         self.assertEqual(len(items),1)
-        self.assertEqual(items[0].findtext('Version'),'0.3.0.0')
+        self.assertEqual(items[0].findtext('Version'),'0.4.0.0')
         self.assertTrue(items[0].findtext('Path').startswith('C:\\ProgramData'))
         self.assertFalse((target/'stale.dll').exists())
         self.assertTrue((second_backup/module.HRID/'stale.dll').exists())

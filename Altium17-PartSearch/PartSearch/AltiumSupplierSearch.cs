@@ -30,6 +30,26 @@ namespace Altium17PartSearch.PartSearch
 
         internal const int PageSize = 50;
 
+        internal async Task<(List<SupplierOffer> Offers, bool Limited)> RefreshOffersAsync(Provider provider, SupplierPart part,
+            CancellationToken token, Action<string> progress)
+        {
+            var offers = new List<SupplierOffer>();
+            // Keyword providers can return other MPNs as well. Scan their pages,
+            // but bound broad searches so a short MPN cannot tie up the panel.
+            const int maxPages = 10;
+            for (int pageIndex = 0; pageIndex < maxPages; pageIndex++)
+            {
+                int offset = pageIndex * PageSize;
+                progress($"Refreshing distributor stock… page {pageIndex + 1}");
+                var page = await SearchAsync(provider, part.Mpn, offset, true, false, token);
+                foreach (var match in page.Parts.Where(p => string.Equals(p.Manufacturer, part.Manufacturer, StringComparison.OrdinalIgnoreCase)))
+                    SupplierAvailability.Merge(offers, match.Offers);
+                bool more = page.SupportsPaging && (page.Total.HasValue ? offset + PageSize < page.Total.Value : page.RawCount >= PageSize);
+                if (!more) return (offers, false);
+            }
+            return (offers, true);
+        }
+
         internal List<Provider> GetProviders()
         {
             var manager = EDP.Utils.GetSupplierManager()
@@ -147,7 +167,7 @@ namespace Altium17PartSearch.PartSearch
                         if (existing == null) _page.Parts.Add(part);
                         else
                         {
-                            existing.Offers.AddRange(part.Offers.Where(o => !existing.Offers.Any(e => e.Supplier == o.Supplier && e.Sku == o.Sku)));
+                            SupplierAvailability.Merge(existing.Offers, part.Offers);
                             if (existing.Datasheet == null) existing.Datasheet = part.Datasheet;
                             foreach (var p in part.Parameters) if (!existing.Parameters.ContainsKey(p.Key)) existing.Parameters[p.Key] = p.Value;
                         }

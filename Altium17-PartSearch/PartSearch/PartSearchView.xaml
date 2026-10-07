@@ -34,18 +34,21 @@
             </ContextMenu></DataGrid.ContextMenu>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="MPN" Binding="{Binding Mpn}" Width="150"/>
+                <DataGridTextColumn Binding="{Binding AvailableStock, StringFormat=N0, TargetNullValue=Unknown}" Width="90" SortMemberPath="AvailableStock">
+                    <DataGridTextColumn.Header><TextBlock Text="Stock" ToolTip="Largest reported listing. Compare each distributor in Stock &amp; prices."/></DataGridTextColumn.Header>
+                </DataGridTextColumn>
                 <DataGridTextColumn Header="Manufacturer" Binding="{Binding Manufacturer}" Width="120"/>
                 <DataGridTextColumn Header="Category" Binding="{Binding CategoryDisplay}" Width="110"/>
                 <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="180"/>
-                <DataGridTextColumn Header="Stock" Binding="{Binding AvailableStock, StringFormat=N0}" Width="75"/>
             </DataGrid.Columns>
         </DataGrid>
         <GridSplitter Grid.Row="4" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
         <Grid Grid.Row="5" Margin="0,8,0,0">
-            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <TextBlock x:Name="partTitle" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,5"/>
             <TextBlock x:Name="descriptionText" Grid.Row="1" TextWrapping="Wrap" Margin="0,0,0,8"/>
-            <TabControl x:Name="detailsTabs" Grid.Row="2">
+            <TextBlock x:Name="stockSummary" Grid.Row="2" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <TabControl x:Name="detailsTabs" Grid.Row="3">
                 <TabItem x:Name="previewTab" Header="Preview">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="8">
@@ -62,13 +65,21 @@
                     <DataGridTextColumn Header="Parameter" Binding="{Binding Key}" Width="*"/>
                     <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="2*"/>
                 </DataGrid.Columns></DataGrid></TabItem>
-                <TabItem Header="Suppliers"><Grid><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                    <DataGrid x:Name="offerGrid" SelectionChanged="Offer_Changed"><DataGrid.Columns>
-                        <DataGridTextColumn Header="Supplier" Binding="{Binding Supplier}" Width="*"/>
-                        <DataGridTextColumn Header="SKU" Binding="{Binding Sku}" Width="*"/>
-                        <DataGridTextColumn Header="Stock" Binding="{Binding StockDisplay}" Width="80"/>
+                <TabItem Header="Stock &amp; prices"><Grid Margin="6"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <DockPanel Margin="0,0,0,8">
+                        <Button x:Name="refreshStockButton" DockPanel.Dock="Right" Content="Refresh stock" Click="RefreshStock_Click"/>
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="Quantity" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox x:Name="quantityBox" Text="1" Width="90" Padding="5,3" VerticalContentAlignment="Center" TextChanged="Quantity_Changed"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <TextBlock x:Name="quantityError" Grid.Row="1" Foreground="#A03020" TextWrapping="Wrap"/>
+                    <DataGrid x:Name="offerGrid" Grid.Row="2" SelectionChanged="Offer_Changed" MouseDoubleClick="Supplier_Click"><DataGrid.Columns>
+                        <DataGridTextColumn Header="Distributor" Binding="{Binding Supplier}" Width="*" MinWidth="110"/>
+                        <DataGridTextColumn Header="In stock" Binding="{Binding StockDisplay}" SortMemberPath="Stock" Width="85"/>
+                        <DataGridTextColumn Header="Unit price" Binding="{Binding UnitPrice}" CanUserSort="False" Width="110"/>
+                        <DataGridTextColumn Header="Availability" Binding="{Binding Availability}" SortMemberPath="CanSupply" Width="110"/>
                     </DataGrid.Columns></DataGrid>
-                    <TextBox x:Name="priceText" Grid.Row="1" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Margin="6" MinHeight="35"/>
+                    <TextBox x:Name="priceText" Grid.Row="3" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Margin="0,8,0,0" MinHeight="55"/>
                 </Grid></TabItem>
                 <TabItem x:Name="modelsTab" Header="Models"><Grid Margin="8"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                     <TextBlock x:Name="modelText" Text="Place part downloads matching symbols and footprints automatically. If several revisions match, choose one below." TextWrapping="Wrap" Margin="0,0,0,8"/>
@@ -78,7 +89,7 @@
                     </DataGrid.Columns></DataGrid>
                 </Grid></TabItem>
             </TabControl>
-            <WrapPanel Grid.Row="3" Margin="0,8,0,0">
+            <WrapPanel Grid.Row="4" Margin="0,8,0,0">
                 <Button x:Name="datasheetButton" Content="Datasheet" Click="Datasheet_Click" IsEnabled="False"/>
                 <Button x:Name="supplierButton" Content="Supplier page" Click="Supplier_Click" IsEnabled="False"/>
                 <Button x:Name="copyButton" Content="Copy parameters" Click="Copy_Click" IsEnabled="False"/>

@@ -3,7 +3,8 @@
 An Altium plugin that backports Manufacturer Part Search to Altium Designer 17.
 
 - Dockable panel in AD17's bottom-right **System** menu.
-- Category browsing, sortable results, parameter filters, stock, prices and datasheets.
+- Category browsing, sortable results, parameter filters and datasheets.
+- Distributor stock and quantity pricing, with refresh through Altium's supplier data.
 - Schematic symbol and footprint previews, including multipart symbols.
 - **Place part** downloads matching CAD from Altium Vaults and attaches the symbol to your schematic cursor. Undo/redo works normally.
 - Fixes Ciiva lookup, supplier links and local footprint/3D model links.
@@ -11,6 +12,7 @@ An Altium plugin that backports Manufacturer Part Search to Altium Designer 17.
 Tested in **Altium Designer 17.1 under Wine**. Uses Altium's existing login; CAD models must be available in a connected Vault.
 
 <img src="docs/part-search-panel.png" alt="Manufacturer Part Search with symbol and footprint previews" width="420">
+<img src="docs/stock-comparison.png" alt="Distributor stock and prices for the requested quantity" width="420">
 
 ## Install
 

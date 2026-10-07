@@ -1,33 +1,20 @@
 using SCH;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 
 namespace Altium17PartSearch.PartSearch
 {
-    internal sealed class SupplierOffer
+    internal sealed class SupplierPart : INotifyPropertyChanged
     {
-        public string Supplier { get; set; }
-        public string Sku { get; set; }
-        public int? Stock { get; set; }
-        public string StockDisplay => Stock.HasValue ? Stock.Value.ToString("N0", CultureInfo.CurrentCulture) : "Unknown";
-        public string Currency { get; set; }
-        public string Url { get; set; }
-        public string Updated { get; set; }
-        public List<PriceBreak> Prices { get; } = new List<PriceBreak>();
-        public string PriceSummary => string.Join("; ", Prices.Select(p => $"{p.Quantity}+: {p.UnitPrice} {Currency}"));
-    }
-
-    internal sealed class PriceBreak
-    {
-        public int Quantity { get; set; }
-        // Keep the provider's formatted price rather than guessing its locale.
-        public string UnitPrice { get; set; }
-    }
-
-    internal sealed class SupplierPart
-    {
+        public event PropertyChangedEventHandler PropertyChanged;
+        internal void StockChanged()
+        {
+            RetrievedUtc = DateTime.UtcNow;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(AvailableStock)));
+        }
         public string Manufacturer { get; set; }
         public string Mpn { get; set; }
         public string Description { get; set; }
@@ -37,7 +24,7 @@ namespace Altium17PartSearch.PartSearch
         public string Provider { get; set; }
         public string PartId { get; set; }
         public string Datasheet { get; set; }
-        public DateTime RetrievedUtc { get; } = DateTime.UtcNow;
+        public DateTime RetrievedUtc { get; private set; } = DateTime.UtcNow;
         public Dictionary<string, string> Parameters { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public List<SupplierOffer> Offers { get; } = new List<SupplierOffer>();
         public string Suppliers => string.Join(", ", Offers.Select(o => o.Supplier).Distinct());
