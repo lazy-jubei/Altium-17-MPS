@@ -29,7 +29,7 @@ try {
     & (Join-Path $repo 'Deploy.ps1') -AltiumVersion $AltiumVersion -ExtensionsRoot $extensions -Force
     [xml]$xml = Get-Content $registry
     if ($xml.SelectNodes('/Extensions/Item[@HRID="Altium17-PartSearch"]').Count -ne 1) { throw 'Duplicate registry entry.' }
-    if ($xml.SelectSingleNode('/Extensions/Item[@HRID="Altium17-PartSearch"]').Version -ne '0.4.1.0') { throw 'Existing registry version was not updated.' }
+    if ($xml.SelectSingleNode('/Extensions/Item[@HRID="Altium17-PartSearch"]').Version -ne '0.5.0.0') { throw 'Existing registry version was not updated.' }
     $item = $xml.SelectSingleNode('/Extensions/Item[@HRID="Altium17-PartSearch"]')
     if ($item.PlatformVersions.DXP.BuildNumber -ne $expectedDxp -or $item.PlatformVersions.EDP.BuildNumber -ne $expectedEdp) {
         throw 'Existing incompatible platform requirements were not repaired.'

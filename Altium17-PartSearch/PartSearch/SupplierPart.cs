@@ -21,6 +21,14 @@ namespace Altium17PartSearch.PartSearch
         public string Category { get; set; }
         public string CategoryDisplay => PartCategory.Display(Category, Description, Parameters.Keys);
         public int? AvailableStock => Offers.Where(o => o.Stock.HasValue).Select(o => o.Stock).DefaultIfEmpty(null).Max();
+        private PassiveParameter PrimaryParameter => PassiveParameter.Primary(CategoryDisplay);
+        private PassiveParameter RatingParameter => PrimaryParameter == PassiveParameter.Resistance ? PassiveParameter.Power : PassiveParameter.Voltage;
+        public string PassiveValueDisplay => PrimaryParameter?.ReadText(Parameters) ?? "";
+        public double? PassiveValueNumeric => PrimaryParameter?.Read(Parameters);
+        public string PassiveRatingDisplay => PrimaryParameter == null ? "" : RatingParameter.ReadText(Parameters);
+        public double? PassiveRatingNumeric => PrimaryParameter == null ? null : RatingParameter.Read(Parameters);
+        public string PassiveToleranceDisplay => PassiveParameter.Tolerance.ReadText(Parameters);
+        public double? PassiveToleranceNumeric => PassiveParameter.Tolerance.Read(Parameters);
         public string Provider { get; set; }
         public string PartId { get; set; }
         public string Datasheet { get; set; }

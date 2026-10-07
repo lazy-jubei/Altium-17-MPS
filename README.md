@@ -3,7 +3,8 @@
 An Altium plugin that backports Manufacturer Part Search to Altium Designer 17.
 
 - Dockable panel in AD17's bottom-right **System** menu.
-- Category browsing, sortable results, parameter filters and datasheets.
+- Category browsing, numeric sorting, parameter filters and datasheets.
+- Resistor/capacitor ranges for value, tolerance and power/voltage, plus package filtering. Leave either bound blank for no limit.
 - Distributor stock and quantity pricing, with refresh through Altium's supplier data.
 - Schematic symbol and footprint previews, including multipart symbols.
 - **Place part** downloads matching CAD from Altium Vaults and attaches the symbol to your schematic cursor. Undo/redo works normally.
@@ -11,7 +12,7 @@ An Altium plugin that backports Manufacturer Part Search to Altium Designer 17.
 
 Tested in **Altium Designer 17.1 under Wine**. Uses Altium's existing login; CAD models must be available in a connected Vault.
 
-<img src="docs/part-search-panel.png" alt="Manufacturer Part Search with symbol and footprint previews" width="420">
+<img src="docs/part-search-panel.png" alt="Manufacturer Part Search with open-ended capacitor filtering and CAD previews" width="420">
 <img src="docs/stock-comparison.png" alt="Distributor stock and prices for the requested quantity" width="420">
 
 ## Install
@@ -21,6 +22,8 @@ Download **Altium-17-MPS-Setup.exe** from the [release](https://github.com/lazy-
 Restart Altium, then choose **System → Manufacturer Part Search (AD17)** at the bottom right. File and Tools shortcuts are also available. Drag the panel to dock it beside your schematic.
 
 Search or choose a category, select a part, preview its CAD and click **Place part**. If several revisions match, choose one in **Models**. **Choose local model** supports installed libraries. The ZIP includes manual installers.
+
+Range filters accept units such as `10k`, `100 nF` and `1 uF`. They apply to loaded supplier results; **Load more** checks further pages and retains earlier matches.
 
 Output is `Documents/AltiumParts/ManufacturerParts.schlib`; `ALTIUM_PART_SEARCH_LIBRARY_DIR` overrides it. Keep the source libraries or Altium's Vault cache for linked models.
 

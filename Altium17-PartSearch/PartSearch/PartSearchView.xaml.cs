@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using DXP;
 using System.Diagnostics;
 using System.Linq;
@@ -21,12 +22,13 @@ namespace Altium17PartSearch.PartSearch
         private readonly ObservableCollection<SupplierPart> _parts = new ObservableCollection<SupplierPart>();
         private CancellationTokenSource _request, _previewDelay;
         private CadPreview _preview;
-        private bool _closed, _busy, _ready, _loaded, _hasNext, _supportsPaging, _canPlace;
+        private bool _closed, _busy, _ready, _loaded, _hasNext, _canPlace;
         private readonly DispatcherTimer _documentTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         private SupplierLibraryImporter.ImportedComponent _imported;
         private LibraryModelChoice _importedModel;
         private SupplierOffer _importedOffer;
-        private int _offset, _quantity = 1;
+        private int _offset, _scanned, _quantity = 1;
+        private List<ParameterRange> _ranges = new List<ParameterRange>();
         private string _query;
         private bool _mpnOnly, _inStock;
         private AltiumSupplierSearch.Provider _provider;
@@ -71,6 +73,8 @@ namespace Altium17PartSearch.PartSearch
                 (text ?? "").IndexOf(filter.Trim(), StringComparison.OrdinalIgnoreCase) >= 0;
             if (!Category.Matches(part.Category, part.Description, part.Parameters.Keys)) return false;
             if (!Contains(part.Manufacturer, manufacturerFilter.Text)) return false;
+            if (_ranges.Any(r => !r.Matches(r.Parameter.Read(part.Parameters)))) return false;
+            if (_ranges.Count > 0 && !Contains(PassiveParameter.Package(part.Parameters), packageFilter.Text)) return false;
             if (string.IsNullOrWhiteSpace(parameterFilter.Text) && string.IsNullOrWhiteSpace(valueFilter.Text)) return true;
             return part.GetImportParameters(null).Any(p => Contains(p.Key, parameterFilter.Text) && Contains(p.Value, valueFilter.Text));
         }
@@ -78,16 +82,38 @@ namespace Altium17PartSearch.PartSearch
         private void Filter_Changed(object sender, TextChangedEventArgs e)
         {
             if (!_ready || _closed) return;
+            RefreshFilters();
+        }
+
+        private bool HasFilters => Category.Keyword.Length > 0 || _ranges.Any(r => r.Active) ||
+            !string.IsNullOrWhiteSpace(manufacturerFilter.Text) || !string.IsNullOrWhiteSpace(parameterFilter.Text) ||
+            !string.IsNullOrWhiteSpace(valueFilter.Text) || _ranges.Count > 0 && !string.IsNullOrWhiteSpace(packageFilter.Text);
+        private bool ValidFilters => _ranges.All(r => r.Error == null);
+        private int MatchCount => CollectionViewSource.GetDefaultView(_parts).Cast<object>().Count();
+        private void ShowResultCount() => statusText.Text = $"{MatchCount} matching parts · {_scanned:N0} supplier listings checked." +
+            (_hasNext ? " Load more to check further results." : "");
+        private void RefreshFilters()
+        {
+            filterError.Text = _ranges.Select(r => r.Error).FirstOrDefault(e => e != null) ?? "";
             CollectionViewSource.GetDefaultView(_parts).Refresh();
+            if (!_busy && _scanned > 0) ShowResultCount();
+            UpdateControls();
+        }
+        private void ClearFilters_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var range in _ranges) { range.Minimum = range.Maximum = ""; }
+            manufacturerFilter.Text = parameterFilter.Text = valueFilter.Text = packageFilter.Text = "";
+            RefreshFilters();
         }
 
         private async void Search_Click(object sender, RoutedEventArgs e)
         {
-            if (_closed || _busy || providerCombo.SelectedItem == null) return;
+            if (_closed || _busy || providerCombo.SelectedItem == null || !ValidFilters) return;
             if (string.IsNullOrWhiteSpace(Category.SearchQuery(queryBox.Text))) { statusText.Text = "Enter an MPN or choose a category."; return; }
             _provider = (AltiumSupplierSearch.Provider)providerCombo.SelectedItem;
             _query = Category.SearchQuery(queryBox.Text); _mpnOnly = !string.IsNullOrWhiteSpace(queryBox.Text) && mpnOnlyBox.IsChecked == true; _inStock = inStockBox.IsChecked == true;
-            _parts.Clear(); _offset = 0; _hasNext = false; pageText.Text = "";
+            _previewDelay?.Cancel();
+            _parts.Clear(); _offset = _scanned = 0; _hasNext = false; pageText.Text = "";
             await LoadPageAsync(0);
         }
 
@@ -100,16 +126,37 @@ namespace Altium17PartSearch.PartSearch
             statusText.Text = $"Searching {_provider.Name}...";
             try
             {
-                var page = await _search.SearchAsync(_provider, _query, offset, _mpnOnly, _inStock, token);
-                if (_closed || token.IsCancellationRequested) return;
-                _offset = offset;
-                _parts.Clear();
-                foreach (var part in page.Parts) _parts.Add(part);
-                _supportsPaging = page.SupportsPaging;
-                _hasNext = _supportsPaging && (page.Total.HasValue ? offset + AltiumSupplierSearch.PageSize < page.Total.Value : page.RawCount >= AltiumSupplierSearch.PageSize);
-                pageText.Text = _supportsPaging ? $"Page {offset / AltiumSupplierSearch.PageSize + 1}" : "MPN results";
-                statusText.Text = $"{CollectionViewSource.GetDefaultView(_parts).Cast<object>().Count()} matching parts on this page. Stock and prices are supplier snapshots.";
-                if (resultsGrid.Items.Count > 0) resultsGrid.SelectedIndex = 0;
+                int before = MatchCount;
+                // AD17 exposes discrete native facets, not numeric ranges. Scan in
+                // cancellable batches and retain prior pages for filtering/sorting.
+                for (int pageIndex = 0; pageIndex < (HasFilters ? 10 : 1); pageIndex++)
+                {
+                    statusText.Text = $"Searching {_provider.Name}… {_scanned:N0} listings checked, {MatchCount} matches.";
+                    var page = await _search.SearchAsync(_provider, _query, offset, _mpnOnly, _inStock, token);
+                    if (_closed || token.IsCancellationRequested) return;
+                    _scanned += page.RawCount;
+                    foreach (var part in page.Parts)
+                    {
+                        var existing = string.IsNullOrWhiteSpace(part.Manufacturer) || string.IsNullOrWhiteSpace(part.Mpn) ? null :
+                            _parts.FirstOrDefault(p => string.Equals(p.Manufacturer, part.Manufacturer, StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(p.Mpn, part.Mpn, StringComparison.OrdinalIgnoreCase));
+                        if (existing == null) _parts.Add(part);
+                        else
+                        {
+                            SupplierAvailability.Merge(existing.Offers, part.Offers);
+                            foreach (var parameter in part.Parameters) if (!existing.Parameters.ContainsKey(parameter.Key)) existing.Parameters[parameter.Key] = parameter.Value;
+                            existing.StockChanged();
+                        }
+                    }
+                    CollectionViewSource.GetDefaultView(_parts).Refresh();
+                    _offset = offset + AltiumSupplierSearch.PageSize;
+                    _hasNext = page.SupportsPaging && (page.Total.HasValue ? _offset < page.Total.Value : page.RawCount >= AltiumSupplierSearch.PageSize);
+                    pageText.Text = $"{_parts.Count:N0} parts loaded";
+                    if (!_hasNext || MatchCount - before >= AltiumSupplierSearch.PageSize) break;
+                    offset = _offset;
+                }
+                ShowResultCount();
+                if (resultsGrid.Items.Count > 0 && SelectedPart == null) resultsGrid.SelectedIndex = 0;
             }
             catch (OperationCanceledException) { if (!_closed) statusText.Text = "Search canceled."; }
             catch (Exception error)
@@ -120,22 +167,41 @@ namespace Altium17PartSearch.PartSearch
             finally { _busy = false; if (!_closed) UpdateControls(); }
         }
 
-        private async void Previous_Click(object sender, RoutedEventArgs e) { if (!_busy && _offset > 0) await LoadPageAsync(_offset - AltiumSupplierSearch.PageSize); }
-        private async void Next_Click(object sender, RoutedEventArgs e) { if (!_busy && _hasNext) await LoadPageAsync(_offset + AltiumSupplierSearch.PageSize); }
+        private async void Next_Click(object sender, RoutedEventArgs e) { if (!_busy && _hasNext && ValidFilters) { _previewDelay?.Cancel(); await LoadPageAsync(_offset); } }
         private void CancelSearch_Click(object sender, RoutedEventArgs e) => _request?.Cancel();
         private void Query_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { e.Handled = true; Search_Click(sender, e); } }
 
         private void Provider_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (!_ready) return;
-            _parts.Clear(); _offset = 0; _hasNext = false; pageText.Text = "";
+            _parts.Clear(); _offset = _scanned = 0; _hasNext = false; pageText.Text = "";
             UpdateControls();
         }
 
         private void Category_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (!_ready || _busy) return;
-            CollectionViewSource.GetDefaultView(_parts).Refresh();
+            _ranges = PassiveParameter.ForCategory(Category.Name).Select(p => new ParameterRange(p)).ToList();
+            foreach (var range in _ranges) range.PropertyChanged += (_, __) => { if (!_closed) RefreshFilters(); };
+            rangeFilters.ItemsSource = _ranges;
+            bool passive = _ranges.Count > 0;
+            passiveFilters.Visibility = passiveValueColumn.Visibility = passiveRatingColumn.Visibility = passiveToleranceColumn.Visibility = passive ? Visibility.Visible : Visibility.Collapsed;
+            if (passive)
+            {
+                passiveValueColumn.Header = _ranges[0].Name;
+                passiveRatingColumn.Header = _ranges[1].Name;
+                rangeHint.Text = "Leave either end blank for no limit. Examples: " + _ranges[0].Example + ".";
+                filtersExpander.IsExpanded = true;
+            }
+            packageFilter.Text = "";
+            resultsGrid.Items.SortDescriptions.Clear();
+            foreach (var column in resultsGrid.Columns) column.SortDirection = null;
+            if (passive)
+            {
+                resultsGrid.Items.SortDescriptions.Add(new SortDescription(nameof(SupplierPart.PassiveValueNumeric), ListSortDirection.Ascending));
+                passiveValueColumn.SortDirection = ListSortDirection.Ascending;
+            }
+            RefreshFilters();
             Search_Click(sender, e);
         }
 
@@ -248,17 +314,16 @@ namespace Altium17PartSearch.PartSearch
         private void UpdateControls()
         {
             if (!_ready || _closed) return;
-            searchButton.IsEnabled = !_busy && providerCombo.SelectedItem != null;
+            searchButton.IsEnabled = !_busy && providerCombo.SelectedItem != null && ValidFilters;
             providerCombo.IsEnabled = queryBox.IsEnabled = mpnOnlyBox.IsEnabled = inStockBox.IsEnabled = categoryCombo.IsEnabled = !_busy;
-            previousButton.IsEnabled = !_busy && _supportsPaging && _offset > 0;
-            nextButton.IsEnabled = !_busy && _hasNext;
+            nextButton.IsEnabled = !_busy && _hasNext && ValidFilters;
             cancelSearchButton.IsEnabled = _busy;
             importButton.IsEnabled = !_busy && !string.IsNullOrWhiteSpace(SelectedPart?.Mpn);
             cloudButton.IsEnabled = downloadMenu.IsEnabled = previewButton.IsEnabled = importButton.IsEnabled;
             placeButton.IsEnabled = placeMenu.IsEnabled = importButton.IsEnabled && PartPlacement.CanPlace;
             placeButton.ToolTip = PartPlacement.CanPlace ? "Download matching CAD models and place on the active schematic" : "Open a schematic to place this part";
             resultsGrid.IsEnabled = offerGrid.IsEnabled = modelGrid.IsEnabled = !_busy;
-            manufacturerFilter.IsEnabled = parameterFilter.IsEnabled = valueFilter.IsEnabled = !_busy;
+            manufacturerFilter.IsEnabled = parameterFilter.IsEnabled = valueFilter.IsEnabled = packageFilter.IsEnabled = rangeFilters.IsEnabled = clearFiltersButton.IsEnabled = !_busy;
             copyButton.IsEnabled = !_busy && SelectedPart != null;
             datasheetButton.IsEnabled = !_busy && WebLinks.IsHttp(SelectedPart?.Datasheet);
             supplierButton.IsEnabled = !_busy && WebLinks.IsHttp(SelectedOffer?.Url);

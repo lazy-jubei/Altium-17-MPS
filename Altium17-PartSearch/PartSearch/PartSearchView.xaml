@@ -19,12 +19,33 @@
             <CheckBox x:Name="mpnOnlyBox" Content="Exact MPN" VerticalAlignment="Center" Margin="0,0,8,0"/>
             <CheckBox x:Name="inStockBox" Content="In stock" VerticalAlignment="Center"/>
         </WrapPanel>
-        <Expander Grid.Row="2" Header="Filters" Margin="0,0,0,8">
-            <WrapPanel Margin="0,8,0,0">
-                <StackPanel Margin="0,0,8,4"><TextBlock Text="Manufacturer"/><TextBox x:Name="manufacturerFilter" Width="155" TextChanged="Filter_Changed"/></StackPanel>
-                <StackPanel Margin="0,0,8,4"><TextBlock Text="Parameter"/><TextBox x:Name="parameterFilter" Width="130" TextChanged="Filter_Changed" ToolTip="Parameter name, such as Resistance"/></StackPanel>
-                <StackPanel Margin="0,0,0,4"><TextBlock Text="Value contains"/><TextBox x:Name="valueFilter" Width="140" TextChanged="Filter_Changed" ToolTip="Parameter value, such as 10 kOhm"/></StackPanel>
-            </WrapPanel>
+        <Expander x:Name="filtersExpander" Grid.Row="2" Header="Filters" Margin="0,0,0,8">
+            <StackPanel Margin="0,8,0,0">
+                <StackPanel x:Name="passiveFilters" Visibility="Collapsed">
+                    <Grid Margin="0,0,0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="85"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="1" Text="Minimum"/><TextBlock Grid.Column="2" Text="Maximum"/>
+                    </Grid>
+                    <ItemsControl x:Name="rangeFilters"><ItemsControl.ItemTemplate><DataTemplate>
+                        <Grid Margin="0,0,0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="85"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="1" Text="{Binding Minimum, UpdateSourceTrigger=PropertyChanged}" ToolTip="{Binding Example}" Margin="0,0,6,0" Padding="4,3" KeyDown="Query_KeyDown"/>
+                            <TextBox Grid.Column="2" Text="{Binding Maximum, UpdateSourceTrigger=PropertyChanged}" ToolTip="{Binding Example}" Padding="4,3" KeyDown="Query_KeyDown"/>
+                        </Grid>
+                    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                    <TextBlock x:Name="rangeHint" TextWrapping="Wrap" Foreground="#555" Margin="0,0,0,5"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6"><TextBlock Text="Package" Width="85" VerticalAlignment="Center"/>
+                        <TextBox x:Name="packageFilter" Width="150" Padding="4,3" TextChanged="Filter_Changed" ToolTip="Case/package, e.g. 0201 or 0603"/>
+                    </StackPanel>
+                </StackPanel>
+                <WrapPanel>
+                    <StackPanel Margin="0,0,8,4"><TextBlock Text="Manufacturer"/><TextBox x:Name="manufacturerFilter" Width="155" TextChanged="Filter_Changed"/></StackPanel>
+                    <StackPanel Margin="0,0,8,4"><TextBlock Text="Parameter"/><TextBox x:Name="parameterFilter" Width="130" TextChanged="Filter_Changed" ToolTip="Parameter name, such as Resistance"/></StackPanel>
+                    <StackPanel Margin="0,0,0,4"><TextBlock Text="Value contains"/><TextBox x:Name="valueFilter" Width="140" TextChanged="Filter_Changed" ToolTip="Parameter value, such as 10 kOhm"/></StackPanel>
+                </WrapPanel>
+                <DockPanel Margin="0,4,0,0"><Button x:Name="clearFiltersButton" DockPanel.Dock="Right" Content="Clear filters" Click="ClearFilters_Click"/>
+                    <TextBlock x:Name="filterError" Foreground="#A03020" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                </DockPanel>
+            </StackPanel>
         </Expander>
         <DataGrid x:Name="resultsGrid" Grid.Row="3" SelectionChanged="Part_Changed" MouseDoubleClick="Place_Click">
             <DataGrid.ContextMenu><ContextMenu>
@@ -33,12 +54,15 @@
                 <Separator/><MenuItem Header="Copy parameters" Click="Copy_Click"/>
             </ContextMenu></DataGrid.ContextMenu>
             <DataGrid.Columns>
-                <DataGridTextColumn Header="MPN" Binding="{Binding Mpn}" Width="150"/>
-                <DataGridTextColumn Binding="{Binding AvailableStock, StringFormat=N0, TargetNullValue=Unknown}" Width="90" SortMemberPath="AvailableStock">
+                <DataGridTextColumn Header="MPN" Binding="{Binding Mpn}" Width="150" MinWidth="150"/>
+                <DataGridTextColumn x:Name="passiveValueColumn" Header="Value" Binding="{Binding PassiveValueDisplay}" SortMemberPath="PassiveValueNumeric" Width="110" MinWidth="110" Visibility="Collapsed"/>
+                <DataGridTextColumn Binding="{Binding AvailableStock, StringFormat=N0, TargetNullValue=Unknown}" Width="90" MinWidth="80" SortMemberPath="AvailableStock">
                     <DataGridTextColumn.Header><TextBlock Text="Stock" ToolTip="Largest reported listing. Compare each distributor in Stock &amp; prices."/></DataGridTextColumn.Header>
                 </DataGridTextColumn>
-                <DataGridTextColumn Header="Manufacturer" Binding="{Binding Manufacturer}" Width="120"/>
-                <DataGridTextColumn Header="Category" Binding="{Binding CategoryDisplay}" Width="110"/>
+                <DataGridTextColumn Header="Manufacturer" Binding="{Binding Manufacturer}" Width="120" MinWidth="100"/>
+                <DataGridTextColumn x:Name="passiveRatingColumn" Header="Rating" Binding="{Binding PassiveRatingDisplay}" SortMemberPath="PassiveRatingNumeric" Width="85" MinWidth="70" Visibility="Collapsed"/>
+                <DataGridTextColumn x:Name="passiveToleranceColumn" Header="Tolerance" Binding="{Binding PassiveToleranceDisplay}" SortMemberPath="PassiveToleranceNumeric" Width="85" MinWidth="85" Visibility="Collapsed"/>
+                <DataGridTextColumn Header="Category" Binding="{Binding CategoryDisplay}" Width="110" MinWidth="85"/>
                 <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" MinWidth="180"/>
             </DataGrid.Columns>
         </DataGrid>
@@ -103,9 +127,8 @@
                 <Button x:Name="importButton" Content="Choose local model…" Click="Import_Click" IsEnabled="False"/>
             </WrapPanel>
             <WrapPanel>
-                <Button x:Name="previousButton" Content="Previous" Click="Previous_Click" IsEnabled="False"/>
                 <TextBlock x:Name="pageText" VerticalAlignment="Center" Margin="6,0"/>
-                <Button x:Name="nextButton" Content="Next" Click="Next_Click" IsEnabled="False"/>
+                <Button x:Name="nextButton" Content="Load more" Click="Next_Click" IsEnabled="False"/>
                 <Button x:Name="cancelSearchButton" Content="Cancel" Click="CancelSearch_Click" IsEnabled="False"/>
             </WrapPanel>
         </StackPanel>
